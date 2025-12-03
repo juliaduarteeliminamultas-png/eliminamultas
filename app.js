@@ -5,10 +5,10 @@ const axios = require('axios');
 // --- Credenciais de Ambiente (Lidas do Render) ---
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN; 
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID; 
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN; // Usamos UPPERCASE para evitar conflito
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN; // Usamos UPPERCASE para clareza
 
 // Configurações básicas do servidor
-const app = express();
+const app = express(); // ⬅️ Apenas uma vez!
 app.use(express.json());
 const port = process.env.PORT || 3000;
 
@@ -46,11 +46,9 @@ async function sendReply(recipientId, textMessage) {
 
 
 // --- Rota GET (Verificação do Webhook) ---
-// Não alterada. Usada apenas na primeira configuração.
 app.get('/', (req, res) => {
   const { 'hub.mode': mode, 'hub.challenge': challenge, 'hub.verify_token': token } = req.query;
   
-  // Usando a variável VERIFY_TOKEN corrigida
   if (mode === 'subscribe' && token === VERIFY_TOKEN) {
     console.log('WEBHOOK VERIFIED');
     res.status(200).send(challenge);
