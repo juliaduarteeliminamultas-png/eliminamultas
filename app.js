@@ -1,24 +1,27 @@
-require('dotenv').config();
+// Import Express and Axios
 const express = require('express');
-const axios = require('axios');
+const axios = require('axios'); 
 
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+// --- Environment Credentials (From Render) ---
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN; 
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID; 
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN; 
 
 const app = express();
 app.use(express.json());
+const port = process.env.PORT || 3000;
 
-const port = process.env.PORT || 10000;
-
-/**
- * Envia template do WhatsApp
- */
-async function sendTemplateReply(recipientId) {
+// --- Function to Send Reply via Cloud API ---
+async function sendReply(recipientId, textMessage) {
+    if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+        console.error("ERROR: ACCESS_TOKEN or PHONE_NUMBER_ID not configured.");
+        return;
+    }
+    
     try {
         await axios({
             method: "POST",
-            url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+            url: `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${ACCESS_TOKEN}`
@@ -26,67 +29,63 @@ async function sendTemplateReply(recipientId) {
             data: {
                 messaging_product: "whatsapp",
                 to: recipientId,
-                type: "template",
-                template: {
-                    name: "service_update_test",
-                    language: { code: "en_US" },
-                    components: [
-                        {
-                            type: "body",
-                            parameters: [
-                                { type: "text", text: "John Doe" },
-                                { type: "text", text: "Account Activation" },
-                                { type: "text", text: "Completed" }
-                            ]
-                        }
-                    ]
+                type: "text",
+                text: {
+                    body: textMessage
                 }
             }
         });
-
-        console.log("✅ Message sent successfully!");
+        console.log(`✅ Message sent successfully to: ${recipientId}`);
     } catch (error) {
-        console.error(
-            "❌ API ERROR:",
-            error.response ? JSON.stringify(error.response.data, null, 2) : error.message
-        );
+        console.error("❌ ERROR SENDING MESSAGE:", error.response ? error.response.data : error.message);
     }
 }
 
-/**
- * Verificação do Webhook
- */
+// --- GET Route (Webhook Verification) ---
 app.get('/', (req, res) => {
-    const mode = req.query['hub.mode'];
-    const token = req.query['hub.verify_token'];
-    const challenge = req.query['hub.challenge'];
-
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-        return res.status(200).send(challenge);
-    }
-    return res.sendStatus(403);
+  const { 'hub.mode': mode, 'hub.challenge': challenge, 'hub.verify_token': token } = req.query;
+  
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    console.log('WEBHOOK VERIFIED');
+    res.status(200).send(challenge);
+  } else {
+    res.status(403).end();
+  }
 });
 
-/**
- * Recebe mensagens do WhatsApp
- */
-app.post('/', async (req, res) => {
-    res.sendStatus(200);
+// --- POST Route (Receiving and Replying) ---
+app.post('/', (req, res) => {
+  const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  console.log(`\nWebhook received ${timestamp}\n`);
+  
+  res.status(200).end();
 
-    const entry = req.body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const message = changes?.value?.messages?.[0];
+  const body = req.body;
+  
+  if (body.object === 'whatsapp_business_account') {
+    body.entry.forEach(entry => {
+        entry.changes.forEach(change => {
+            if (change.field === 'messages') {
+                const messageData = change.value;
+                
+                if (messageData.messages && messageData.messages.length > 0) {
+                    const message = messageData.messages[0];
+                    const senderId = message.from;
+                    const incomingText = message.text ? message.text.body : 'Other message type';
+                    
+                    console.log(`Message from ${senderId}: "${incomingText}"`);
 
-    if (!message) return;
-
-    console.log("📩 Mensagem recebida de:", message.from);
-
-    await sendTemplateReply(message.from);
+                    // --- ENGLISH RESPONSE FOR META APPROVAL ---
+                    const responseText = `Hello! This is the automated assistant for [Sua Empresa]. 🚀\n\nI have received your message: "${incomingText}".\n\nA team member will assist you shortly. Please stay tuned!`;
+                    
+                    sendReply(senderId, responseText);
+                }
+            }
+        });
+    });
+  }
 });
 
-/**
- * Inicializa servidor
- */
 app.listen(port, () => {
-    console.log(`🚀 Server running on port ${port}`);
+  console.log(`\nListening on port ${port}\n`);
 });
