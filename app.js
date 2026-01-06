@@ -24,7 +24,7 @@ async function sendTemplateReply(recipientId) {
                 type: "template",
                 template: {
                     name: "service_update_test",
-                    language: { code: "en" },
+                    language: { code: "en_us" },
                     components: [{
                         type: "body",
                         parameters: [
