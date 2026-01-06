@@ -1,51 +1,47 @@
-// Importar Express (para o servidor) e Axios (para fazer requisições HTTP)
+// Import Express and Axios
 const express = require('express');
 const axios = require('axios'); 
 
-// --- Credenciais de Ambiente (Lidas do Render) ---
+// --- Environment Credentials (From Render) ---
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN; 
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID; 
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN; // Usamos UPPERCASE para clareza
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN; 
 
-// Configurações básicas do servidor
-const app = express(); // ⬅️ Apenas uma vez!
+const app = express();
 app.use(express.json());
 const port = process.env.PORT || 3000;
 
-
-// --- Função para Enviar a Resposta via Cloud API ---
+// --- Function to Send Reply via Cloud API ---
 async function sendReply(recipientId, textMessage) {
     if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
-        console.error("ERRO: ACCESS_TOKEN ou PHONE_NUMBER_ID não configurados no Render.");
+        console.error("ERROR: ACCESS_TOKEN or PHONE_NUMBER_ID not configured.");
         return;
     }
     
     try {
         await axios({
-            method: "POST", // A API de envio SEMPRE usa POST
+            method: "POST",
             url: `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${ACCESS_TOKEN}` // O token para autenticação
+                "Authorization": `Bearer ${ACCESS_TOKEN}`
             },
             data: {
                 messaging_product: "whatsapp",
-                to: recipientId, // O número de quem enviou
+                to: recipientId,
                 type: "text",
                 text: {
-                    body: textMessage // A mensagem de resposta
+                    body: textMessage
                 }
             }
         });
-        console.log(`✅ Mensagem enviada com sucesso para: ${recipientId}`);
+        console.log(`✅ Message sent successfully to: ${recipientId}`);
     } catch (error) {
-        // Se houver erro, loga a resposta do Meta para ajudar na depuração
-        console.error("❌ ERRO AO ENVIAR MENSAGEM:", error.response ? error.response.data : error.message);
+        console.error("❌ ERROR SENDING MESSAGE:", error.response ? error.response.data : error.message);
     }
 }
 
-
-// --- Rota GET (Verificação do Webhook) ---
+// --- GET Route (Webhook Verification) ---
 app.get('/', (req, res) => {
   const { 'hub.mode': mode, 'hub.challenge': challenge, 'hub.verify_token': token } = req.query;
   
@@ -57,16 +53,13 @@ app.get('/', (req, res) => {
   }
 });
 
-
-// --- Rota POST (Recebimento de Mensagens e Resposta) ---
+// --- POST Route (Receiving and Replying) ---
 app.post('/', (req, res) => {
   const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-  console.log(`\n\nWebhook received ${timestamp}\n`);
+  console.log(`\nWebhook received ${timestamp}\n`);
   
-  // Responda ao Meta imediatamente com 200 OK para evitar timeouts
   res.status(200).end();
 
-  // --- LÓGICA DE PROCESSAMENTO E RESPOSTA ---
   const body = req.body;
   
   if (body.object === 'whatsapp_business_account') {
@@ -75,16 +68,16 @@ app.post('/', (req, res) => {
             if (change.field === 'messages') {
                 const messageData = change.value;
                 
-                // Verifica se é uma mensagem de texto recebida
                 if (messageData.messages && messageData.messages.length > 0) {
                     const message = messageData.messages[0];
-                    const senderId = message.from; // Número do remetente
-                    const incomingText = message.text ? message.text.body : 'Mensagem de outro tipo';
+                    const senderId = message.from;
+                    const incomingText = message.text ? message.text.body : 'Other message type';
                     
-                    console.log(`Mensagem recebida de ${senderId}: "${incomingText}"`);
+                    console.log(`Message from ${senderId}: "${incomingText}"`);
 
-                    // Chama a função para enviar uma resposta automática
-                    const responseText = `Recebi sua mensagem: "${incomingText}". Meu chatbot está funcionando perfeitamente!`;
+                    // --- ENGLISH RESPONSE FOR META APPROVAL ---
+                    const responseText = `Hello! This is the automated assistant for [Sua Empresa]. 🚀\n\nI have received your message: "${incomingText}".\n\nA team member will assist you shortly. Please stay tuned!`;
+                    
                     sendReply(senderId, responseText);
                 }
             }
@@ -93,7 +86,6 @@ app.post('/', (req, res) => {
   }
 });
 
-// Inicia o servidor
 app.listen(port, () => {
   console.log(`\nListening on port ${port}\n`);
 });
