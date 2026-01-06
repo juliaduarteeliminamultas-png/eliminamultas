@@ -33,7 +33,7 @@ async function sendTemplateReply(recipientId, incomingText) {
                 template: {
                     name: "official_welcome_message",
                     language: {
-                        code: "en_US" 
+                        code: "en" 
                     },
                     components: [
                         {
