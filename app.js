@@ -1,7 +1,17 @@
-// --- Função Ajustada para Enviar Modelo (Template) ---
-async function sendReply(recipientId) {
+const express = require('express');
+const axios = require('axios'); 
+
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN; 
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID; 
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN; 
+
+const app = express();
+app.use(express.json());
+const port = process.env.PORT || 10000;
+
+async function sendTemplateReply(recipientId) {
     if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
-        console.error("ERROR: Credentials not configured.");
+        console.error("❌ ERROR: Credentials missing in Render Environment.");
         return;
     }
     
@@ -18,10 +28,8 @@ async function sendReply(recipientId) {
                 to: recipientId,
                 type: "template",
                 template: {
-                    name: "service_update_test", // O nome que deve estar no Painel da Meta
-                    language: { 
-                        code: "en_GB" // Tente en_GB se en_US falhar
-                    },
+                    name: "service_update_test",
+                    language: { code: "en_GB" }, // Tente en_GB conforme conversamos
                     components: [{
                         type: "body",
                         parameters: [
@@ -33,26 +41,36 @@ async function sendReply(recipientId) {
                 }
             }
         });
-        console.log(`✅ Template sent successfully!`);
+        console.log(`✅ Template sent successfully to: ${recipientId}`);
     } catch (error) {
-        console.error("❌ ERROR SENDING TEMPLATE:", error.response ? JSON.stringify(error.response.data) : error.message);
+        console.error("❌ API ERROR:", error.response ? JSON.stringify(error.response.data) : error.message);
     }
 }
 
-// --- POST Route Ajustado ---
+app.get('/', (req, res) => {
+    const { 'hub.mode': mode, 'hub.challenge': challenge, 'hub.verify_token': token } = req.query;
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+        console.log('✅ WEBHOOK VERIFIED');
+        res.status(200).send(challenge);
+    } else {
+        res.status(403).end();
+    }
+});
+
 app.post('/', (req, res) => {
     res.status(200).end();
     const body = req.body;
-    
     if (body.object === 'whatsapp_business_account') {
-        body.entry.forEach(entry => {
-            entry.changes.forEach(change => {
-                if (change.field === 'messages' && change.value.messages) {
-                    const senderId = change.value.messages[0].from;
-                    // Chama a função de modelo em vez de texto simples
-                    sendReply(senderId);
-                }
-            });
-        });
+        const entry = body.entry?.[0];
+        const changes = entry?.changes?.[0];
+        const message = changes?.value?.messages?.[0];
+        if (message) {
+            console.log(`📩 Incoming message from: ${message.from}`);
+            sendTemplateReply(message.from);
+        }
     }
+});
+
+app.listen(port, () => {
+    console.log(`🚀 Server running on port ${port}`);
 });
