@@ -29,7 +29,7 @@ async function sendTemplateReply(recipientId) {
                 type: "template",
                 template: {
                     name: "service_update_test",
-                    language: { code: "en_GB" }, // Tente en_GB conforme conversamos
+                    language: { code: "en_US" },
                     components: [{
                         type: "body",
                         parameters: [
@@ -65,12 +65,12 @@ app.post('/', (req, res) => {
         const changes = entry?.changes?.[0];
         const message = changes?.value?.messages?.[0];
         if (message) {
-            console.log(`📩 Incoming message from: ${message.from}`);
+            console.log(`Incoming message from: ${message.from}`);
             sendTemplateReply(message.from);
         }
     }
 });
 
 app.listen(port, () => {
-    console.log(`🚀 Server running on port ${port}`);
+    console.log(`Server running on port ${port}`);
 });
