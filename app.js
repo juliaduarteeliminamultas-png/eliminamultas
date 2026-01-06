@@ -10,11 +10,6 @@ app.use(express.json());
 const port = process.env.PORT || 10000;
 
 async function sendTemplateReply(recipientId) {
-    if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
-        console.error("❌ ERROR: Credentials missing in Render Environment.");
-        return;
-    }
-    
     try {
         await axios({
             method: "POST",
@@ -29,7 +24,7 @@ async function sendTemplateReply(recipientId) {
                 type: "template",
                 template: {
                     name: "service_update_test",
-                    language: { code: "en_US" },
+                    language: { code: "en" },
                     components: [{
                         type: "body",
                         parameters: [
@@ -41,16 +36,18 @@ async function sendTemplateReply(recipientId) {
                 }
             }
         });
-        console.log(`✅ Template sent successfully to: ${recipientId}`);
+        console.log("Success: Message sent to " + recipientId);
     } catch (error) {
-        console.error("❌ API ERROR:", error.response ? JSON.stringify(error.response.data) : error.message);
+        console.error("API ERROR:", error.response ? JSON.stringify(error.response.data) : error.message);
     }
 }
 
 app.get('/', (req, res) => {
-    const { 'hub.mode': mode, 'hub.challenge': challenge, 'hub.verify_token': token } = req.query;
+    const mode = req.query['hub.mode'];
+    const challenge = req.query['hub.challenge'];
+    const token = req.query['hub.verify_token'];
+
     if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-        console.log('✅ WEBHOOK VERIFIED');
         res.status(200).send(challenge);
     } else {
         res.status(403).end();
@@ -61,16 +58,15 @@ app.post('/', (req, res) => {
     res.status(200).end();
     const body = req.body;
     if (body.object === 'whatsapp_business_account') {
-        const entry = body.entry?.[0];
-        const changes = entry?.changes?.[0];
-        const message = changes?.value?.messages?.[0];
+        const entry = body.entry && body.entry[0];
+        const changes = entry && entry.changes && entry.changes[0];
+        const message = changes && changes.value && changes.value.messages && changes.value.messages[0];
         if (message) {
-            console.log(`Incoming message from: ${message.from}`);
             sendTemplateReply(message.from);
         }
     }
 });
 
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log("Server running on port " + port);
 });
